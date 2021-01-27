@@ -13,22 +13,56 @@ class TrainEngine(object):
     for training
     """
 
-    def __init__(self):
+    def __init__(self, init_state=None):
 
-        # state of the engine. After training
-        # this parameter will contain the trained model
-        self._state = {"epoch": 0, "max_epoch": 0,
-                       "model": None,
-                       "stop": False,
-                       "optimizer": None,
-                       "loader": None}
+        if init_state is None:
+            # state of the engine. After training
+            # this parameter will contain the trained model
+            self._state = {"epoch": 0, "max_epoch": 0,
+                           "model": None,
+                           "stop": False,
+                           "optimizer": None,
+                           "optimization_method": None,
+                           "optimization_config": None,
+                           "task_loader": None}
+        else:
+            self._state = init_state
+
+            if "optimizer" not in self._state:
+                self._state["optimizer"] = self._state['optimization_method'](self._state['model'].parameters(),
+                                                                              **self._state['optimization_config'])
 
         # various hooks to apply
         self._hooks = {}
 
     @property
     def state(self):
-        return self._train
+        return self._state
+
+    @property
+    def max_epoch(self):
+        return self._state["max_epoch"]
+
+    @max_epoch.setter
+    def max_epoch(self, value):
+        self._state["max_epoch"] = value
+
+    @property
+    def optimizer(self):
+        return self._state["optimizer"]
+
+    @optimizer.setter
+    def optimizer(self, value):
+        self._state["optimizer"] = value
+
+    @property
+    def task_loader(self):
+        return self._state["task_loader"]
+
+    @task_loader.setter
+    def task_loader(self, value):
+        self._state["task_loader"] = value
+
 
     def train(self):
 
