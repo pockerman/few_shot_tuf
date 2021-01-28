@@ -14,5 +14,12 @@ def init_seed(manual_seed):
 
 
 def init_dataloader(dataset, sampler):
+
+    if sampler is None:
+        raise ValueError("Sampler is not specified and is None")
+
+    if dataset is None:
+        raise ValueError("Dataset is not specified and is None")
+
     dataloader = torch.utils.data.DataLoader(dataset, batch_sampler=sampler)
     return dataloader
