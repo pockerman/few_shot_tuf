@@ -10,6 +10,7 @@ from utils import timefn
 from utils import INFO
 from utils import read_json
 from train_helpers import init_seed
+from train_helpers import init_dataloader
 
 @timefn
 def train():
@@ -23,8 +24,10 @@ def train():
 
     options = read_json(filename="train_config.json")
 
+    # initialize seed for random generation utilities
     init_seed(manual_seed=options.seed)
 
+    # the model to train
     model = PrototypicalNetTUF.build_network(options=options)
 
     # initialize the optimizer
@@ -35,6 +38,10 @@ def train():
     torch.optim.lr_scheduler.StepLR(optimizer=optim,
                                     gamma=options.lr_scheduler_gamma,
                                     step_size=options.lr_scheduler_step)
+
+    sampler = EpisodicTask.init_sampler(labels=None, mode='train', options=options)
+
+    tr_dataloader = init_dataloader(dataset=None, sampler=sampler)
 
     engine_init_state = {"model": model,
                          "task_loader": EpisodicTask(n_episodes=10, n_way=6, n_shot=10),
