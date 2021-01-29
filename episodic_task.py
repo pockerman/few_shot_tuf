@@ -21,15 +21,15 @@ class EpisodicTask(object):
     @staticmethod
     def init_sampler(labels, mode, options):
 
-        if 'train' in mode:
-            classes_per_it = options.classes_per_it_tr
-            num_samples = options.num_support_tr + options.num_query_tr
+        if mode == 'train':
+            classes_per_it = options["classes_per_it_tr"]
+            num_samples = options["num_support_tr"] + options["num_query_tr"]
         else:
-            classes_per_it = options.classes_per_it_val
-            num_samples = options.num_support_val + options.num_query_val
+            classes_per_it = options["classes_per_it_val"]
+            num_samples = options["num_support_val"] + options["num_query_val"]
 
         return EpisodicTask(labels=labels, classes_per_it=classes_per_it,
-                            num_samples=num_samples, iterations=options.iterations)
+                            num_samples=num_samples, iterations=options["iterations"])
 
     def __init__(self,  labels, classes_per_it, num_samples, iterations):
         self._labels = labels
