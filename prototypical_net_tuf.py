@@ -23,7 +23,8 @@ def prototypical_loss(input, target, n_support):
     Inspired by https://github.com/jakesnell/prototypical-networks/blob/master/protonets/models/few_shot.py
 
     Compute the barycentres by averaging the features of n_support
-    samples for each class in target, computes then the distances from each
+    samples for each class in target.
+    It then computes the distances from each
     samples' features to each one of the barycentres, computes the
     log_probability for each n_query samples for each one of the current
     classes, of appartaining to a class c, loss and accuracy are then computed
@@ -45,6 +46,7 @@ def prototypical_loss(input, target, n_support):
     # FIXME when torch.unique will be available on cuda too
     classes = torch.unique(target_cpu)
     n_classes = len(classes)
+
     # FIXME when torch will support where as np
     # assuming n_query, n_target constants
     n_query = target_cpu.eq(classes[0].item()).sum().item() - n_support
@@ -52,6 +54,7 @@ def prototypical_loss(input, target, n_support):
     support_idxs = list(map(supp_idxs, classes))
 
     prototypes = torch.stack([input_cpu[idx_list].mean(0) for idx_list in support_idxs])
+
     # FIXME when torch will support where as np
     query_idxs = torch.stack(list(map(lambda c: target_cpu.eq(c).nonzero()[n_support:], classes))).view(-1)
 
@@ -93,17 +96,17 @@ def conv_block(in_channels, out_channels):
                          nn.BatchNorm2d(out_channels), nn.ReLU(), nn.MaxPool2d(2))
 
 
-class PrototypicalNetTUF(nn.Module):
+class ProtoNetTUF(nn.Module):
     """
     Class defining Prototypical network
     """
 
     @staticmethod
     def build_network(options):
-        return PrototypicalNetTUF().to(device=options["device"])
+        return ProtoNetTUF().to(device=options["device"])
 
-    def __init__(self, x_dim=1, hid_dim=1, z_dim=1 ):
-        super(PrototypicalNetTUF, self).__init__()
+    def __init__(self, x_dim=1, hid_dim=1, z_dim=1):
+        super(ProtoNetTUF, self).__init__()
 
         self._encoder = nn.Sequential(conv_block(in_channels=x_dim, out_channels=hid_dim),
                                       conv_block(in_channels=hid_dim, out_channels=hid_dim),

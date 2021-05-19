@@ -14,25 +14,11 @@ class TrainEngine(object):
     for training
     """
 
-    def __init__(self, init_state=None):
+    def __init__(self, model=None):
 
-        if init_state is None:
-            # state of the engine. After training
-            # this parameter will contain the trained model
-            self._state = {"epoch": 0,
-                           "max_epochs": 0,
-                           "model": None,
-                           "stop": False,
-                           "optimizer": None,
-                           "optimization_method": None,
-                           "task_loader": None,
-                           "decice": 'cpu',
-                           "lr_scheduler": None}
-        else:
-            self._state = init_state
-
-            if "epoch" not in self._state:
-                self._state["epoch"] = 0
+        self._state = {"epoch": 0,
+                       "model": model,
+                       "stop": False}
 
         # various hooks to apply
         self._hooks = {}
@@ -40,14 +26,6 @@ class TrainEngine(object):
     @property
     def state(self):
         return self._state
-
-    @property
-    def max_epochs(self):
-        return self._state["max_epochs"]
-
-    @max_epochs.setter
-    def max_epochs(self, value):
-        self._state["max_epochs"] = value
 
     @property
     def optimizer(self):
@@ -67,12 +45,18 @@ class TrainEngine(object):
 
     def train(self, options):
 
+        # make sure that engine state is sane
         assert self._state['model'] is not None, "Model has not been specified"
-        assert self._state["lr_scheduler"] is not None, "Learning scheduler has not been specified"
-        assert self._state["optimization_method"] is not None, "Optimizer has not been specified"
-        assert "max_epochs" in self._state, "Maximum number of epochs has not been specified"
-        assert self._state["max_epochs"] > 0, "Invalid number of max epochs"
-        assert "device" in self._state, "Device has not been specified"
+
+        assert options is not None, "Training options not specified"
+        assert options["lr_scheduler"] is not None, "Learning scheduler has not been specified"
+        assert options["optimizater"] is not None, "Optimizer has not been specified"
+        assert options["max_epochs"] > 0, "Invalid number of max epochs"
+        assert options["sample_loader"] is not None, "Sample loader has not been specified"
+        assert "device" in options["device"], "Device has not been specified"
+
+        max_epochs = options["max_epochs"]
+        optimizer = options["optimizer"]
 
         train_loss = []
         train_acc = []
@@ -80,7 +64,7 @@ class TrainEngine(object):
         val_acc = []
         best_acc = 0
 
-        while self._state["epoch"] < self._state["max_epochs"]: #and not self._state["stop"]:
+        while self._state["epoch"] < max_epochs:
             print("Training epoch: {0}".format(self._state["epoch"]))
 
             # Let the model know that we are training
@@ -90,25 +74,40 @@ class TrainEngine(object):
             self._state['model'].train()
 
             # loop over the sample supplied by the sample loader
-            # for the current epoch
-            for sample in tqdm(self._state['task_loader']['xs'], desc="Epoch {:d} train".format(self._state['epoch'] + 1)):
+            # for the current epoch. Here we effectively extract a batch
+            for sample in tqdm(options['sample_loader']['xs'],
+                               desc="Epoch {:d} train".format(self._state['epoch'] + 1)):
+
                 # zero the optimizer gradient
                 # that is zero the parameter gradients
                 # gradient buffers had to be manually set to zero using optimizer.zero_grad().
                 # because gradients are accumulated in the Backprop step
-                self._state['optimization_method'].zero_grad()
+                # Before the backward pass, use the optimizer object to zero all of the
+                # gradients for the variables it will update (which are the learnable
+                # weights of the model). This is because by default, gradients are
+                # accumulated in buffers( i.e, not overwritten) whenever .backward()
+                # is called. Checkout docs of torch.autograd.backward for more details.
+                optimizer.zero_grad()
 
                 X, y = sample
-                X.to(self._state['device'])
-                y.to(self._state['device'])
 
+                X.to(options['device'])
+                y.to(options['device'])
+
+                # apply the model to predict the label
                 model_output = self._state['model'](X)
+
+                # comput the loss
                 loss, acc = self._state['model'].loss_fn(model_output, target=y,
                                                          n_support=options.num_support_tr)
 
-                # backward propagate
+                # backward propagate.
+                # This call will compute the
+                #  gradient of loss with respect to all Tensors with requires_grad=True.
                 loss.backward()
 
+                # # Calling the step function on an
+                # Optimizer makes an update to its parameters
                 self._state['optimization_method'].step()
 
                 train_loss.append(loss.item())

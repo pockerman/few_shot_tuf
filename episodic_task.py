@@ -10,7 +10,7 @@ import torch
 
 class EpisodicTask(object):
     """
-    PrototypicalBatchSampler: yield a batch of indexes at each iteration.
+    EpisodicTask yield a batch of indexes at each iteration.
     Indexes are calculated by keeping in account 'classes_per_it' and 'num_samples',
     In fact at every iteration the batch indexes will refer to  'num_support' + 'num_query' samples
     for 'classes_per_it' random classes.
