@@ -50,13 +50,15 @@ class TrainEngine(object):
 
         assert options is not None, "Training options not specified"
         assert options["lr_scheduler"] is not None, "Learning scheduler has not been specified"
-        assert options["optimizater"] is not None, "Optimizer has not been specified"
+        assert options["optimizer"] is not None, "Optimizer has not been specified"
         assert options["max_epochs"] > 0, "Invalid number of max epochs"
+        assert options["iterations"] > 0, "Invalid number of iterations per epoch"
         assert options["sample_loader"] is not None, "Sample loader has not been specified"
-        assert "device" in options["device"], "Device has not been specified"
+        assert "device" not in options["device"], "Device has not been specified"
 
         max_epochs = options["max_epochs"]
         optimizer = options["optimizer"]
+        tr_dataloader = options["sample_loader"]
 
         train_loss = []
         train_acc = []
@@ -65,7 +67,7 @@ class TrainEngine(object):
         best_acc = 0
 
         while self._state["epoch"] < max_epochs:
-            print("Training epoch: {0}".format(self._state["epoch"]))
+            print(print('> Epoch: {0}'.format(self._state["epoch"])))
 
             # Let the model know that we are training
             # see the thread: https://stackoverflow.com/questions/51433378/what-does-model-train-do-in-pytorch
@@ -73,10 +75,11 @@ class TrainEngine(object):
             # it informs the model that it undergoes training
             self._state['model'].train()
 
+            tr_iter = iter(tr_dataloader)
+
             # loop over the sample supplied by the sample loader
             # for the current epoch. Here we effectively extract a batch
-            for sample in tqdm(options['sample_loader']['xs'],
-                               desc="Epoch {:d} train".format(self._state['epoch'] + 1)):
+            for batch in tqdm(tr_iter):
 
                 # zero the optimizer gradient
                 # that is zero the parameter gradients
@@ -89,7 +92,7 @@ class TrainEngine(object):
                 # is called. Checkout docs of torch.autograd.backward for more details.
                 optimizer.zero_grad()
 
-                X, y = sample
+                X, y = batch
 
                 X.to(options['device'])
                 y.to(options['device'])
@@ -113,7 +116,8 @@ class TrainEngine(object):
                 train_loss.append(loss.item())
                 train_acc.append(acc.item())
 
-            avg_loss = np.mean(train_loss[-options.iterations:])
-            avg_acc = np.mean(train_acc[-options.iterations:])
+            avg_loss = np.mean(train_loss[-options["iterations"]:])
+            avg_acc = np.mean(train_acc[-options["iterations"]:])
             print('Average Train Loss: {}, Average Train Acc: {}'.format(avg_loss, avg_acc))
-            self._state["lr_scheduler"].step()
+            options["lr_scheduler"].step()
+            self._state["epoch"] += 1
