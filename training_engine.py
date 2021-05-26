@@ -67,7 +67,7 @@ class TrainEngine(object):
         best_acc = 0
 
         while self._state["epoch"] < max_epochs:
-            print(print('> Epoch: {0}'.format(self._state["epoch"])))
+            print('> Epoch: {0}'.format(self._state["epoch"]))
 
             # Let the model know that we are training
             # see the thread: https://stackoverflow.com/questions/51433378/what-does-model-train-do-in-pytorch
@@ -94,16 +94,20 @@ class TrainEngine(object):
 
                 X, y = batch
 
+                #print("> X shape {0}".format(X.shape))
+                #print("> y shape {0}".format(y.shape))
+
                 X.to(options['device'])
                 y.to(options['device'])
 
                 # apply the model to predict the label
                 model_output = self._state['model'](X)
 
-                # comput the loss
-                loss, acc = self._state['model'].loss_fn(model_output, target=y,
-                                                         n_support=options.num_support_tr)
+                #print("> model out {0}".format(model_output))
 
+                # comput the loss
+                loss, acc = self._state['model'].loss_fn(input=model_output, target=y,
+                                                         n_support=options["num_support_tr"])
                 # backward propagate.
                 # This call will compute the
                 #  gradient of loss with respect to all Tensors with requires_grad=True.
@@ -111,7 +115,7 @@ class TrainEngine(object):
 
                 # # Calling the step function on an
                 # Optimizer makes an update to its parameters
-                self._state['optimization_method'].step()
+                optimizer.step()
 
                 train_loss.append(loss.item())
                 train_acc.append(acc.item())

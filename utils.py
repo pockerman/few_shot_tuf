@@ -3,6 +3,8 @@ from functools import wraps
 import time
 import os
 from pathlib import Path
+import torch
+import numpy as np
 
 INFO = "INFO: "
 
@@ -17,6 +19,16 @@ def timefn(fn):
         return result
 
     return measure
+
+
+def init_seed(options: dict) -> None:
+    '''
+    Disable cudnn to maximize reproducibility
+    '''
+    torch.cuda.cudnn_enabled = False
+    np.random.seed(options["seed"])
+    torch.manual_seed(options["seed"])
+    torch.cuda.manual_seed(options["seed"])
 
 
 def read_json(filename):

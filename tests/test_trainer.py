@@ -12,6 +12,8 @@ from training_engine import TrainEngine
 from prototypical_net_tuf import ProtoNetTUF
 from tuf_dataset import TUFDataset
 from batch_sampler import BatchSampler
+from encoders import linear
+from utils import init_seed
 
 
 class TestTrainEngine(unittest.TestCase):
@@ -35,7 +37,7 @@ class TestTrainEngine(unittest.TestCase):
 
         with pytest.raises(AssertionError) as error:
 
-            proto_net = ProtoNetTUF()
+            proto_net = ProtoNetTUF(encoder=None)
             train_engine = TrainEngine(model=proto_net)
             train_engine.train(options=None)
 
@@ -45,7 +47,7 @@ class TestTrainEngine(unittest.TestCase):
 
         with pytest.raises(AssertionError) as error:
 
-            proto_net = ProtoNetTUF()
+            proto_net = ProtoNetTUF(encoder=None)
             train_engine = TrainEngine(model=proto_net)
 
             options = {"lr_scheduler": None}
@@ -57,7 +59,7 @@ class TestTrainEngine(unittest.TestCase):
 
         with pytest.raises(AssertionError) as error:
 
-            proto_net = ProtoNetTUF()
+            proto_net = ProtoNetTUF(encoder=linear(in_features=2, out_features=1))
             train_engine = TrainEngine(model=proto_net)
 
             # optimizer to be used for learning
@@ -77,7 +79,7 @@ class TestTrainEngine(unittest.TestCase):
 
         with pytest.raises(AssertionError) as error:
 
-            proto_net = ProtoNetTUF()
+            proto_net = ProtoNetTUF(encoder=linear(in_features=2, out_features=1))
             train_engine = TrainEngine(model=proto_net)
 
             # optimizer to be used for learning
@@ -96,7 +98,7 @@ class TestTrainEngine(unittest.TestCase):
 
     def test_trainer_6(self):
         with pytest.raises(AssertionError) as error:
-            proto_net = ProtoNetTUF()
+            proto_net = ProtoNetTUF(encoder=linear(in_features=2, out_features=1))
             train_engine = TrainEngine(model=proto_net)
 
             # optimizer to be used for learning
@@ -116,7 +118,7 @@ class TestTrainEngine(unittest.TestCase):
 
     def test_trainer_7(self):
         with pytest.raises(AssertionError) as error:
-            proto_net = ProtoNetTUF()
+            proto_net = ProtoNetTUF(encoder=linear(in_features=2, out_features=3))
             train_engine = TrainEngine(model=proto_net)
 
             # optimizer to be used for learning
@@ -130,34 +132,46 @@ class TestTrainEngine(unittest.TestCase):
 
             options = {"optimizer": optimizer, "lr_scheduler": lr_scheduler,
                        "max_epochs": 2, "device": "cpu", "iterations": 1,
-                       "sample_loader": None}
+                       "sample_loader": None,
+                       "num_support_tr": 6}
+
             train_engine.train(options=options)
         self.assertEqual(str(error.value), "Sample loader has not been specified")
 
-
     def test_trainer_8(self):
 
-        proto_net = ProtoNetTUF()
+        init_seed(options={"seed": 0})
+
+        # learning rate scheduler step
+        lr_scheduler_step = 15
+        num_support_tr = 6
+        num_query_tr = 12
+        num_samples = num_support_tr + num_query_tr
+        # number of random classes per episode for training
+        # this should be equal or less than the unique number
+        # of classes in the dataset
+        classes_per_it = 3
+        iterations = 10
+
+        proto_net = ProtoNetTUF(encoder=linear(in_features=2, out_features=3))
         train_engine = TrainEngine(model=proto_net)
 
         # optimizer to be used for learning
         optimizer = optim.Adam(params=proto_net.parameters(),
-                               lr=0.1, weight_decay=0.01)
+                               lr=0.1, weight_decay=0.001)
 
         # how to reduce the learning rate
-        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer,
-                                                       gamma=0.01, step_size=0.5, verbose=True)
+        lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer, gamma=0.01,
+                                                       step_size=lr_scheduler_step,  verbose=True)
 
         train_loader = TUFDataset(filename=Path("../train_data.csv"), dataset_type="train")
-        query_loader = TUFDataset(filename=Path("../train_data.csv"), dataset_type="query")
-        sampler = BatchSampler(labels=train_loader.labels,
-                               classes_per_it=3, num_samples=6,
-                               iterations=20, mode="train")
+        sampler = BatchSampler(labels=train_loader.labels, classes_per_it=classes_per_it,
+                               num_samples=num_samples, iterations=iterations, mode="train")
 
         dataloader = torch.utils.data.DataLoader(train_loader, batch_sampler=sampler)
         options = {"optimizer": optimizer, "lr_scheduler": lr_scheduler,
-                   "max_epochs": 2, "device": "cpu", "sample_loader": dataloader,
-                   "iterations": 10}
+                   "max_epochs": 1, "device": "cpu", "sample_loader": dataloader,
+                   "iterations": iterations, "num_support_tr": num_support_tr}
 
         train_engine.train(options=options)
 

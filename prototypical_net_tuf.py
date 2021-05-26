@@ -11,13 +11,6 @@ import torch.nn.functional as F
 from distances import euclidean_dist
 
 
-def conv_block_(in_channels, out_channels):
-    bn = nn.BatchNorm2d(out_channels)
-    nn.init.uniform_(bn.weight) # for pytorch 1.2 or later
-    return nn.Sequential(nn.Conv2d(in_channels, out_channels, 3, padding=1),
-                         bn, nn.ReLU(), nn.MaxPool2d(2))
-
-
 def prototypical_loss(input, target, n_support):
     """
     Inspired by https://github.com/jakesnell/prototypical-networks/blob/master/protonets/models/few_shot.py
@@ -32,8 +25,7 @@ def prototypical_loss(input, target, n_support):
     Args:
     - input: the model output for a batch of samples
     - target: ground truth for the above batch of samples
-    - n_support: number of samples to keep in account when computing
-      barycentres, for each one of the current classes
+    - n_support: number of samples to keep in account when computing barycentres, for each one of the current classes
     """
 
     target_cpu = target.to('cpu')
@@ -88,14 +80,6 @@ class PrototypicalLoss(nn.Module):
         return prototypical_loss(input, target, self.n_support)
 
 
-def conv_block(in_channels, out_channels):
-    """
-    returns a block conv-bn-relu-pool
-    """
-    return nn.Sequential(nn.Conv2d(in_channels, out_channels, 3, padding=1),
-                         nn.BatchNorm2d(out_channels), nn.ReLU(), nn.MaxPool2d(2))
-
-
 class ProtoNetTUF(nn.Module):
     """
     Class defining Prototypical network
@@ -105,14 +89,11 @@ class ProtoNetTUF(nn.Module):
     def build_network(options):
         return ProtoNetTUF().to(device=options["device"])
 
-    def __init__(self, x_dim=1, hid_dim=1, z_dim=1):
+    def __init__(self, encoder: nn.Sequential = None) -> None:
         super(ProtoNetTUF, self).__init__()
 
-        self._encoder = nn.Sequential(conv_block(in_channels=x_dim, out_channels=hid_dim),
-                                      conv_block(in_channels=hid_dim, out_channels=hid_dim),
-                                      conv_block(in_channels=hid_dim, out_channels=hid_dim),
-                                      conv_block(in_channels=hid_dim, out_channels=z_dim),)
-
+        self._encoder = encoder
+        
     def loss_fn(self, input, target, n_support):
         """
         Compute loss function

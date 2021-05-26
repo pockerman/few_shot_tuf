@@ -55,6 +55,10 @@ class TUFDataset(data.Dataset):
             X_tmp = []
             y_tmp = []
             for row in csv_reader:
+
+                if len(row) == 0:
+                    break
+
                 if row[0] == '#':
                     self._n_classes = int(row[1].split(':')[-1])
                 else:
@@ -63,8 +67,11 @@ class TUFDataset(data.Dataset):
                     y_tmp.append(int(label))
                     X_tmp.append([float(row[0]), float(row[1])])
 
-            self._X = torch.tensor(data=np.array(X_tmp), device=self._device)
-            self._y = torch.tensor(data=np.array(y_tmp), device=self._device)
+            if len(X_tmp) == 0 or len(y_tmp) == 0:
+                raise ValueError("Empty dataset or empty labels")
+
+            self._X = torch.tensor(data=np.array(X_tmp), device=self._device).float()
+            self._y = torch.tensor(data=np.array(y_tmp), device=self._device).float()
 
     def __getitem__(self, idx):
         """
