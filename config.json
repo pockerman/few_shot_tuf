@@ -1,0 +1,22 @@
+{
+  "device": "cpu",
+  "seed": 0,
+  "in_features": 2,
+  "out_features": 6,
+  "iterations": 100,
+  "train_dataset": "./data/train/proto/train.csv",
+  "max_epochs": 1000,
+  "classes_per_it": 6,
+  "num_support_tr": 10,
+  "num_query_tr": 175,
+  "optimizer": {
+    "name": "Adam",
+    "lr": 0.01,
+    "weight_decay": 0.001
+  },
+  "lr_scheduler": {
+    "name": "StepLR",
+    "gamma": 0.01,
+    "step_size": 100
+  }
+}
