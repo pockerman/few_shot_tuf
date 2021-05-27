@@ -14,6 +14,20 @@ class TrainEngine(object):
     for training
     """
 
+    @staticmethod
+    def build_options(optimizer, lr_scheduler, max_epochs,
+                      iterations, sample_loader, device, num_support_tr) -> dict:
+
+        options = dict()
+        options["lr_scheduler"] = lr_scheduler
+        options["optimizer"] = optimizer
+        options["max_epochs"] = max_epochs
+        options["iterations"] = iterations
+        options["sample_loader"] = sample_loader
+        options["device"] = device
+        options["num_support_tr"] = num_support_tr
+        return options
+
     def __init__(self, model=None):
 
         self._state = {"epoch": 0,
@@ -94,16 +108,11 @@ class TrainEngine(object):
 
                 X, y = batch
 
-                #print("> X shape {0}".format(X.shape))
-                #print("> y shape {0}".format(y.shape))
-
                 X.to(options['device'])
                 y.to(options['device'])
 
                 # apply the model to predict the label
                 model_output = self._state['model'](X)
-
-                #print("> model out {0}".format(model_output))
 
                 # comput the loss
                 loss, acc = self._state['model'].loss_fn(input=model_output, target=y,

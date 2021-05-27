@@ -86,8 +86,8 @@ class ProtoNetTUF(nn.Module):
     """
 
     @staticmethod
-    def build_network(options):
-        return ProtoNetTUF().to(device=options["device"])
+    def build_network(encoder: nn.Sequential, options: dict) -> object:
+        return ProtoNetTUF(encoder=encoder).to(device=options["device"])
 
     def __init__(self, encoder: nn.Sequential = None) -> None:
         super(ProtoNetTUF, self).__init__()

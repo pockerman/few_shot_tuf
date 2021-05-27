@@ -1,5 +1,6 @@
 import json
 from functools import wraps
+
 import time
 import os
 from pathlib import Path
@@ -7,6 +8,7 @@ import torch
 import numpy as np
 
 INFO = "INFO: "
+WARNING = "WARNING: "
 
 def timefn(fn):
     @wraps(fn)
@@ -31,13 +33,13 @@ def init_seed(options: dict) -> None:
     torch.cuda.manual_seed(options["seed"])
 
 
-def read_json(filename):
+def read_json(filename: Path) -> dict:
 
     """
         Read the json configuration file and
         return a map with the config entries
     """
-    with open(filename) as json_file:
+    with open(filename, 'r') as json_file:
         json_input = json.load(json_file)
         return json_input
 

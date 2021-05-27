@@ -3,12 +3,11 @@ import pytest
 
 from pathlib import Path
 import torch
-import torch.nn as nn
+
 import torch.optim as optim
 import torch.utils.data as data
-import torch.nn.functional as F
 
-from training_engine import TrainEngine
+from train_engine import TrainEngine
 from prototypical_net_tuf import ProtoNetTUF
 from tuf_dataset import TUFDataset
 from batch_sampler import BatchSampler
@@ -164,7 +163,7 @@ class TestTrainEngine(unittest.TestCase):
         lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer, gamma=0.01,
                                                        step_size=lr_scheduler_step,  verbose=True)
 
-        train_loader = TUFDataset(filename=Path("../train_data.csv"), dataset_type="train")
+        train_loader = TUFDataset(filename=Path("./test_data/train_data.csv"), dataset_type="train")
         sampler = BatchSampler(labels=train_loader.labels, classes_per_it=classes_per_it,
                                num_samples=num_samples, iterations=iterations, mode="train")
 

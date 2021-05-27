@@ -1,40 +1,39 @@
+from pathlib import Path
 import torch
-import torch.optim as optim
-import torch.optim.lr_scheduler as lr_scheduler
-import torchnet as tnt
-
-from training_engine import TrainEngine
-from prototypical_net_tuf import PrototypicalNetTUF
-from episodic_task import EpisodicTask
+from train_engine import TrainEngine
+from prototypical_net_tuf import ProtoNetTUF
 from utils import timefn
-from utils import INFO
-from utils import read_json
-from train_helpers import init_seed
-from train_helpers import init_dataloader
+from utils import INFO, WARNING
+from utils import read_json, init_seed
 from tuf_dataset import TUFDataset
+from encoders import linear, linear_with_softmax
+from batch_sampler import BatchSampler
+
 
 @timefn
-def train():
+def train(configuration: dict) -> None:
 
-    # the device to use
-    device = 'cpu'
-    if torch.cuda.is_available():
-        print("WARNING: You have a CUDA device, so you should probably run with --cuda")
-    else:
-        print("{0} Using CPU device".format(INFO))
+    device = configuration['device']
 
-    options = read_json(filename="train_config.json")
+    if device == 'gpu' and not torch.cuda.is_available():
+        print("{0} You specified CUDA as device but PyTorch configuration does not support CUDA".format(WARNING))
+        print("{0} Setting device to cpu".format(WARNING))
+        configuration['device'] = 'cpu'
+
+    num_samples = configuration["num_support_tr"] + configuration["num_query_tr"]
 
     # initialize seed for random generation utilities
-    init_seed(manual_seed=options["seed"])
+    init_seed(options=configuration)
 
     # the model to train
-    model = PrototypicalNetTUF.build_network(options=options)
+    model = ProtoNetTUF.build_network(encoder=linear_with_softmax(in_features=configuration["in_features"],
+                                                                  out_features=configuration["out_features"]),
+                                      options=configuration)
 
     # initialize the optimizer
     optim = torch.optim.Adam(params=model.parameters(),
-                             lr=options["learning_rate"],
-                             weight_decay=options["weight_decay"])
+                             lr=configuration["optimizer"]["lr"],
+                             weight_decay=configuration["optimizer"]["weight_decay"])
 
     # initialize scheduler for learning rate decay
     # Decays the learning rate of each parameter group by gamma every step_size epochs.
@@ -42,37 +41,29 @@ def train():
     # to the learning rate from outside this scheduler.
     # When last_epoch=-1, sets initial lr as lr.
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optim,
-                                                    gamma=options["lr_scheduler_gamma"],
-                                                    step_size=options["lr_scheduler_step"])
+                                                    gamma=configuration["lr_scheduler"]["gamma"],
+                                                    step_size=configuration["lr_scheduler"]["step_size"])
 
-    tr_tuf_dataset = TUFDataset(filename=options["train_dataset"], dataset_type="support")
-    print("{0} Training set size={1}".format(INFO, len(tr_tuf_dataset)))
+    train_loader = TUFDataset(filename=Path(configuration["train_dataset"]), dataset_type="train")
+    sampler = BatchSampler(labels=train_loader.labels,
+                           classes_per_it=configuration["classes_per_it"],
+                           num_samples=num_samples,
+                           iterations=configuration["iterations"], mode="train")
 
-    tr_query_dataset = TUFDataset(filename=options["query_dataset"], dataset_type="query")
-    print("{0} Query set size={1}".format(INFO, len(tr_query_dataset)))
-
-    support_sampler = EpisodicTask.init_sampler(labels=tr_tuf_dataset.labels,
-                                                mode='train', options=options)
-
-    query_sampler = EpisodicTask.init_sampler(labels=tr_query_dataset.labels,
-                                              mode='query', options=options)
-
-    tr_dataloader = init_dataloader(dataset=tr_tuf_dataset, sampler=support_sampler)
-    query_dataloader = init_dataloader(dataset=tr_tuf_dataset, sampler=query_sampler)
-
-    engine_init_state = {"model": model,
-                         "task_loader": {"xs": tr_dataloader, "xq": query_dataloader},
-                         "optimization_method": optim,
-                         "lr_scheduler": lr_scheduler,
-                         "max_epochs": options["max_epochs"],
-                         "device": options["device"]}
-
-    engine = TrainEngine(init_state=engine_init_state)
+    dataloader = torch.utils.data.DataLoader(train_loader, batch_sampler=sampler)
+    engine = TrainEngine(model=model)
 
     # train the model
-    engine.train(options=options)
+    engine.train(options=TrainEngine.build_options(optimizer=optim, lr_scheduler=lr_scheduler,
+                                                   max_epochs=configuration["max_epochs"],
+                                                   iterations=configuration["iterations"],
+                                                   device=configuration["device"],
+                                                   sample_loader=dataloader,
+                                                   num_support_tr=configuration["num_support_tr"]))
 
 
 if __name__ == '__main__':
-    print("{0} Training prototypical ne")
-    train()
+    print("{0} Training prototypical network".format(INFO))
+    config_filename = Path("./config.json")
+    configuration = read_json(filename=config_filename)
+    train(configuration=configuration)
