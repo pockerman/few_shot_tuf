@@ -5,11 +5,12 @@ import numpy as np
 import torch
 import torch.utils.data as data
 
-
+"""
 def get_default_class_labels():
     return {"Duplicate": 0, "Full-Delete": 1,
-            "Normal-1": 2, "Normal-2": 3,
-            "Single-Delete": 4, "TUF": 5}
+            "Normal-1": 2, "Single-Delete": 3,
+            "TUF": 4, "Normal-2": 5}
+"""
 
 
 class TUFDataset(data.Dataset):
@@ -17,7 +18,7 @@ class TUFDataset(data.Dataset):
     Class representing TUF dataset
     """
 
-    def __init__(self, filename: Path, dataset_type: str, classes=get_default_class_labels(),
+    def __init__(self, filename: Path, dataset_type: str, classes,
                  do_load=True, device: str='cpu', transform: object=None) -> None:
         super(TUFDataset, self).__init__()
         self._filename = filename
@@ -75,13 +76,21 @@ class TUFDataset(data.Dataset):
 
     def __getitem__(self, idx):
         """
-        Returns the idx tuple: (example_point, example_label
+        Returns the idx tuple: (example_point, example_label)
         """
-        x = self._X[idx]
 
-        if self._transform:
-            x = self._transform(x)
-        return x, self._y[idx]
+        try:
+            x = self._X[idx]
+
+            if self._transform:
+                x = self._transform(x)
+            return x, self._y[idx]
+        except IndexError as e:
+            print(self._dataset_type)
+            print(idx)
+            print(self._X.shape)
+            print(len(self))
+            raise e
 
     def __len__(self):
         return len(self._X)

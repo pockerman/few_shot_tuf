@@ -106,3 +106,9 @@ class ProtoNetTUF(nn.Module):
         """
         x = self._encoder(x)
         return x.view(x.size(0), -1)
+
+    def predict(self, x):
+        self.train(mode=False)
+
+        result = self.forward(x=x)
+        return 0
