@@ -37,7 +37,17 @@ class TrainEngine(object):
 
         self._state = {"epoch": 0,
                        "model": model,
-                       "stop": False}
+                       "stop": False,
+                       "average_train_loss": [],
+                       "average_train_acc": [],
+                       "average_validation_loss": [],
+                       "average_validation_acc": [],
+                       "train_loss": [],
+                       "train_acc": [],
+                       "validation_loss": [],
+                       "validation_acc": [],
+                       "best_acc": 0.0,
+                       "best_model_state": None}
 
     @property
     def state(self):
@@ -73,13 +83,18 @@ class TrainEngine(object):
         assert "device" not in options["device"], "Device has not been specified"
 
         max_epochs = options["max_epochs"]
-        best_model_state = None
+        self._state["best_model_state"] = None
+        self._state["best_acc"] = 0.0
 
-        train_loss = []
-        train_acc = []
-        val_loss = []
-        val_acc = []
-        best_acc = 0
+        self._state["train_loss"] = []
+        self._state["train_acc"] = []
+        self._state["validation_loss"] = []
+        self._state["validation_acc"] = []
+
+        self._state["average_train_loss"] = []
+        self._state["average_train_acc"] = []
+        self._state["average_validation_loss"] = []
+        self._state["average_validation_acc"] = []
 
         while self._state["epoch"] < max_epochs:
 
@@ -90,10 +105,10 @@ class TrainEngine(object):
             # this does not train the model as it may be implied but
             # it informs the model that it undergoes training
             self._state['model'].train()
-            avg_loss, avg_acc = self.train_model(options=options,
-                                                 train_loss=train_loss,
-                                                 train_acc=train_acc)
+            avg_loss, avg_acc = self.train_model(options=options)
             print('Average Train Loss: {}, Average Train Acc: {}'.format(avg_loss, avg_acc))
+            self._state["average_train_loss"].append(avg_loss)
+            self._state["average_train_acc"].append(avg_acc)
 
             options["lr_scheduler"].step()
             self._state["epoch"] += 1
@@ -102,20 +117,27 @@ class TrainEngine(object):
 
                 print("{0} Validating model...".format(INFO))
                 self._state['model'].eval()
-                avg_loss, avg_acc = self.validate_model(options=options, val_loss=val_loss, val_acc=val_acc)
-                postfix = ' (Best)' if avg_acc >= best_acc else ' (Best: {})'.format( best_acc)
+                avg_loss, avg_acc = self.validate_model(options=options)
+                postfix = ' (Best)' if avg_acc >= self._state["best_acc"] else ' (Best: {})'.format(self._state["best_acc"])
                 print('Avg Validation Loss: {}, Avg Validation Acc: {}{}'.format( avg_loss, avg_acc, postfix))
 
-                if avg_acc >= best_acc:
+                self._state["average_validation_loss"].append(avg_loss)
+                self._state["average_validation_acc"].append(avg_acc)
+
+                if avg_acc >= self._state["best_acc"]:
 
                     if "save_model" in options and options["save_model"]:
-                        save_path = Path(options["save_model_path"] + "/" + options["model_name"])
-                        torch.save(self._state['model'].state_dict(), save_path)
-                    best_acc = avg_acc
-                    best_model_state = self._state['model'].state_dict()
 
-    def train_model(self, options: dict,
-                    train_loss: list, train_acc: list) -> Tuple[float, float]:
+                        save_path = Path(options["save_model_path"]) /options["model_name"]
+                        torch.save(self._state['model'].state_dict(), save_path)
+                    self._state["best_acc"] = avg_acc
+                    self._state["best_model_state"] = self._state['model'].state_dict()
+
+        if 'validate' in options and options["validate"]:
+            save_path = Path(options["save_model_path"]) / "best_model"
+            torch.save(self._state['best_model_state'], save_path)
+
+    def train_model(self, options: dict) -> Tuple[float, float]:
 
         optimizer = options["optimizer"]
         tr_dataloader = options["sample_loader"]
@@ -157,14 +179,15 @@ class TrainEngine(object):
             # Optimizer makes an update to its parameters
             optimizer.step()
 
-            train_loss.append(loss.item())
-            train_acc.append(acc.item())
-        avg_loss = np.mean(train_loss[-options["iterations"]:])
-        avg_acc = np.mean(train_acc[-options["iterations"]:])
+            self._state["train_loss"].append(loss.item())
+            self._state["train_acc"].append(acc.item())
+
+        avg_loss = np.mean(self._state["train_loss"][-options["iterations"]:])
+        avg_acc = np.mean(self._state["train_acc"][-options["iterations"]:])
 
         return avg_loss, avg_acc
 
-    def validate_model(self, options: dict, val_loss: list, val_acc: list) -> Tuple[float, float]:
+    def validate_model(self, options: dict) -> Tuple[float, float]:
 
         device = options["device"]
         validation_dataloader = options["validation_dataloader"]
@@ -176,9 +199,10 @@ class TrainEngine(object):
             model_output = self._state['model'](x)
             loss, acc = self._state['model'].loss_fn(model_output, target=y,
                                                      n_support=options["num_support_validation"])
-            val_loss.append(loss.item())
-            val_acc.append(acc.item())
 
-        avg_loss = np.mean(val_loss[-options["iterations"]:])
-        avg_acc = np.mean(val_acc[-options["iterations"]:])
+            self._state["validation_loss"].append(loss.item())
+            self._state["validation_acc"].append(acc.item())
+
+        avg_loss = np.mean(self._state["validation_loss"][-options["iterations"]:])
+        avg_acc = np.mean(self._state["validation_acc"][-options["iterations"]:])
         return avg_loss, avg_acc
