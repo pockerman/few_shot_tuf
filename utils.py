@@ -88,7 +88,7 @@ def load_data_file(filename, type_convert):
         return region_means
 
 
-def make_data_array(wga_mu, no_wga_mu, gc, use_ratio, use_gc):
+def make_data_array(wga_mu, no_wga_mu, gc, use_ratio, use_gc, wga_first=False):
     """
     Using the two data arrays returns an array as pairs.
 
@@ -113,16 +113,28 @@ def make_data_array(wga_mu, no_wga_mu, gc, use_ratio, use_gc):
     if use_ratio and use_gc:
 
         if gc is None or len(gc) == 0:
-            raise  ValueError("GC array is either None or empty")
+            raise ValueError("GC array is either None or empty")
 
         if len(gc) != len(no_wga_mu):
             raise ValueError("GC array size={0} is not equal to {1}".format(len(gc), len(no_wga_mu)))
 
-        for no_wga_val, wga_val, gc_val in zip(no_wga_mu, wga_mu, gc):
-            data.append([no_wga_val, wga_val, (wga_val + 1) / (no_wga_val + 1), gc_val])
+        if wga_first:
+            for no_wga_val, wga_val, gc_val in zip(no_wga_mu, wga_mu, gc):
+                data.append([wga_val, no_wga_val, (wga_val + 1) / (no_wga_val + 1), gc_val])
+        else:
+
+            for no_wga_val, wga_val, gc_val in zip(no_wga_mu, wga_mu, gc):
+                data.append([no_wga_val, wga_val, (wga_val + 1) / (no_wga_val + 1), gc_val])
+
     elif use_ratio:
-        for no_wga, wga in zip(no_wga_mu, wga_mu):
-            data.append([no_wga, wga, (wga + 1) / (no_wga + 1)])
+
+        if wga_first:
+            for no_wga, wga in zip(no_wga_mu, wga_mu):
+                data.append([wga, no_wga, (wga + 1) / (no_wga + 1)])
+        else:
+            for no_wga, wga in zip(no_wga_mu, wga_mu):
+                data.append([no_wga, wga, (wga + 1) / (no_wga + 1)])
+
     elif use_gc:
 
         if gc is None:
@@ -131,12 +143,21 @@ def make_data_array(wga_mu, no_wga_mu, gc, use_ratio, use_gc):
         if gc is None or len(gc) != len(no_wga_mu):
             raise ValueError("GC array size={0} is not equal to {1}".format(len(gc), len(no_wga_mu)))
 
-        for no_wga_val, wga_val, gc_val in zip(no_wga_mu, wga_mu, gc):
-            data.append([no_wga_val, wga_val, gc_val])
+        if wga_first:
+            for no_wga_val, wga_val, gc_val in zip(no_wga_mu, wga_mu, gc):
+                data.append([wga_val, no_wga_val, gc_val])
+        else:
+            for no_wga_val, wga_val, gc_val in zip(no_wga_mu, wga_mu, gc):
+                data.append([no_wga_val, wga_val, gc_val])
     else:
 
-        for no_wga, wga in zip(no_wga_mu, wga_mu):
-            data.append([no_wga, wga])
+        if wga_first:
+            for no_wga, wga in zip(no_wga_mu, wga_mu):
+                data.append([wga, no_wga])
+        else:
+            for no_wga, wga in zip(no_wga_mu, wga_mu):
+                data.append([no_wga, wga])
+
 
     return data
 
