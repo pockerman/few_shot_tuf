@@ -1,5 +1,8 @@
+import json
+import os
 from pathlib import Path
 import torch
+import matplotlib.pyplot as plt
 from train_engine import TrainEngine
 from prototypical_net_tuf import ProtoNetTUF
 from utils import timefn
@@ -8,6 +11,7 @@ from utils import read_json, init_seed
 from tuf_dataset import TUFDataset
 from encoders import linear, linear_with_softmax
 from batch_sampler import BatchSampler
+
 
 def extend_options_from_config(configuration, options):
 
@@ -32,6 +36,23 @@ def extend_options_from_config(configuration, options):
 @timefn
 def train(configuration: dict) -> None:
 
+    dirs = os.listdir(configuration["save_model_path"])
+
+    if configuration["model_name"] in dirs:
+        raise ValueError(f"Directory {configuration['model_name']} exists")
+
+    # create directory if it doesnt exist
+    output_path = Path(configuration["save_model_path"] + "/" + configuration["model_name"])
+
+    # create the output directory
+    os.mkdir(path=output_path)
+
+    configuration["save_model_path"] = str(output_path)
+
+    with open(output_path / "config.json", 'w', newline="\n") as fh:
+        # save the configuration in the output
+        json.dump(configuration, fh)
+
     device = configuration['device']
 
     if device == 'gpu' and not torch.cuda.is_available():
@@ -44,7 +65,7 @@ def train(configuration: dict) -> None:
 
     # the model to train
     model = ProtoNetTUF.build_network(encoder=linear_with_softmax(in_features=configuration["in_features"],
-                                                                  out_features=configuration["out_features"]),
+                                                                  out_features=len(configuration["classes"])),
                                       options=configuration)
 
     # initialize the optimizer
@@ -58,8 +79,8 @@ def train(configuration: dict) -> None:
     # to the learning rate from outside this scheduler.
     # When last_epoch=-1, sets initial lr as lr.
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optim,
-                                                    gamma=configuration["lr_scheduler"]["gamma"],
-                                                    step_size=configuration["lr_scheduler"]["step_size"])
+                                                   gamma=configuration["lr_scheduler"]["gamma"],
+                                                   step_size=configuration["lr_scheduler"]["step_size"])
 
     train_dataset = TUFDataset(filename=Path(configuration["train_dataset"]),
                                dataset_type="train",
@@ -74,13 +95,12 @@ def train(configuration: dict) -> None:
     sampler = BatchSampler(labels=train_dataset.labels,
                            classes_per_it=len(configuration["classes"]),
                            num_samples=num_samples,
-                           iterations=configuration["iterations"], mode="train")
+                           iterations=configuration["iterations"],
+                           mode="train")
 
     dataloader = torch.utils.data.DataLoader(train_dataset, batch_sampler=sampler)
 
-    engine = TrainEngine(model=model)
-
-    # train the model
+    # options for the training engine
     options = TrainEngine.build_options(optimizer=optim, lr_scheduler=lr_scheduler,
                                         max_epochs=configuration["max_epochs"],
                                         iterations=configuration["iterations"],
@@ -96,11 +116,12 @@ def train(configuration: dict) -> None:
         num_query_validation = configuration["num_query_validation"]
         num_samples_validation = num_query_validation + num_support_validation
 
-        print("Number of samples validation ", num_samples_validation)
+        print(f"{INFO} Number of samples validation {num_samples_validation}")
 
         validation_dataset = TUFDataset(filename=Path(configuration["validate_dataset"]),
                                         dataset_type="validate",
                                         classes=configuration["classes"])
+
         print(f"{INFO} Validation dataset size {len(validation_dataset)} ")
 
         val_sampler = BatchSampler(labels=validation_dataset.labels,
@@ -113,16 +134,42 @@ def train(configuration: dict) -> None:
         options["validation_dataloader"] = validation_dataloader
         options["num_support_validation"] = configuration["num_support_validation"]
 
-
     # train the model
+    engine = TrainEngine(model=model)
     engine.train(options=options)
 
-    #if configuration["save_model"]:
-    #    save_path = Path(configuration["save_model_path"] / configuration["model_name"])
-    #    torch.save(engine.state["model"].state_dict(), save_path)
+    engine_state = engine.state
+
+    x = [epoch for epoch in range(configuration["max_epochs"])]
+
+    train_loss = engine_state["average_train_loss"]
+    validation_loss = engine_state["average_validation_loss"]
+
+    plt.plot(x, train_loss, 'r*', label="Train loss")
+    plt.plot(x, validation_loss, 'bo', label="Validation loss")
+    plt.xlabel("Epoch")
+    plt.ylabel("Average Loss")
+    plt.legend(loc="upper right")
+    plt.title("Train vs Validation loss. $\eta=${0}, Iterations/epoch {1}".format(configuration["optimizer"]["lr"],
+                                                                                  configuration["iterations"]))
+    plt.savefig(Path(configuration["save_model_path"] + "/" + "train_validation_loss.png"))
+    plt.close()
+
+    train_acc = engine_state["average_train_acc"]
+    validation_acc = engine_state["average_validation_acc"]
+
+    plt.plot(x, train_acc, 'r*', label="Train accuracy")
+    plt.plot(x, validation_acc, 'bo', label="Validation accuracy")
+    plt.xlabel("Epoch")
+    plt.ylabel("Average Accuracy")
+    plt.legend(loc="upper right")
+    plt.title("Train vs Validation accuracy. $\eta=${0}, Iterations/epoch {1}".format(configuration["optimizer"]["lr"],
+                                                                                  configuration["iterations"]))
+    plt.savefig(Path(configuration["save_model_path"] + "/" + "train_validation_accuracy.png"))
 
 
 if __name__ == '__main__':
+
     print("{0} Training prototypical network".format(INFO))
     config_filename = Path("./config.json")
     configuration = read_json(filename=config_filename)
