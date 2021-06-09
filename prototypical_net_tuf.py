@@ -7,7 +7,7 @@ is taken from
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+import numpy as np
 from distances import euclidean_dist
 
 
@@ -111,4 +111,4 @@ class ProtoNetTUF(nn.Module):
         self.train(mode=False)
 
         result = self.forward(x=x)
-        return 0
+        return np.argmax(result.detach().numpy(), axis=1)

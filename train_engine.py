@@ -161,6 +161,12 @@ class TrainEngine(object):
 
             X, y = batch
 
+            print(len(batch))
+            X = X.view(len(X), 0)
+
+            #X = torch.unsqueeze(X, 0)
+            #X = torch.unsqueeze(X, 1)
+
             X.to(options['device'])
             y.to(options['device'])
 
